@@ -38,6 +38,7 @@ app.get('/:username/:appId/identifier', async (req: Request, res: Response) => {
     const appId = req.params.appId;
 
     if(username == null || appId == null) {
+        console.log('username or appid null')
         return res.status(400).json({'status' : 'username or appid null'})
     }
 
