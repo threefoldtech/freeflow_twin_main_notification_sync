@@ -1,1 +1,1 @@
-# freeflow_twin_main_notification_sync
+# Notification synchronization for FreeFlow Twin
