@@ -33,21 +33,18 @@ admin.initializeApp({ credential: cert(serviceAccount) })
 
 const db = new Datastore(admin)
 
-app.post('/identify', async (req: Request, res: Response) => {
-    const body = req.body
+app.get('/:username/:appId/identifier', async (req: Request, res: Response) => {
+    const username = req.params.username
+    const appId = req.params.appId;
 
-    if (!body['username'] || !body['appId'] || !body['identifier']) {
-        console.log(`Not all required parameters are inside the body: `, body)
-        return res.sendStatus(400)
+    if(username == null || appId == null) {
+        return res.status(400).json({'status' : 'username or appid null'})
     }
 
-    const username = body['username']
-    const appId = body['appId']
-    const identifier = body['identifier']
 
     if (!req.headers[Headers.JIMBER_HEADER] || !req.headers[Headers.JIMBER_HEADER]) {
         console.log('No Jimber header present')
-        return res.sendStatus(400)
+        return res.status(400).json({'status': 'no jimber header present'})
     }
 
     const signedAuthorization: string = req.headers[Headers.JIMBER_HEADER] as string
@@ -57,14 +54,60 @@ app.post('/identify', async (req: Request, res: Response) => {
     console.log(`Derived key for user: ${username} : `, derivedPublicKey)
     if (derivedPublicKey == null) {
         console.log(`Could not find public key for user ${username} with appId ${appId}`)
-        return res.sendStatus(404)
+        return res.status(404).json({'status': 'no public key found for given user'})
     }
 
-    const header = { 'intention': 'identify' }
+    const header = { 'intention': 'retrieve-identifier' }
     const verifiedAuthorization = await validateSign(header, signedAuthorization, derivedPublicKey)
     if (verifiedAuthorization == null) {
         console.log('Could not verify the headers')
-        return res.sendStatus(400)
+        return res.status(400).json({'status': 'could not verify headers'})
+    }
+
+    const query = db.createQuery('Identifiers').filter('appId', '=', appId).filter('username', '=', username).limit(1)
+    const [identifiers] = await db.runQuery(query)
+
+    if(identifiers.length == 0) {
+        return res.status(404).json({'status': 'identifier not found'})
+    }
+
+    return res.status(200).json({'identifier' : identifiers[0]['identifier']})
+})
+
+
+app.post('/identify', async (req: Request, res: Response) => {
+    const body = req.body
+
+    if (!body['username'] || !body['appId'] || !body['identifier']) {
+        console.log(`Not all required parameters are inside the body: `, body)
+        return res.status(400).json({'status': 'not all required parameters are inside the body'})
+    }
+
+    const username = body['username']
+    const appId = body['appId']
+    const identifier = body['identifier']
+
+
+    if (!req.headers[Headers.JIMBER_HEADER] || !req.headers[Headers.JIMBER_HEADER]) {
+        console.log('No Jimber header present')
+        return res.status(400).json({'status': 'no jimber header present'})
+    }
+
+    const signedAuthorization: string = req.headers[Headers.JIMBER_HEADER] as string
+    console.log('This is the signed authorization: ', signedAuthorization)
+
+    const derivedPublicKey = await getDerivedPublicKeyByUsername(username, appId)
+    console.log(`Derived key for user: ${username} : `, derivedPublicKey)
+    if (derivedPublicKey == null) {
+        console.log(`Could not find public key for user ${username} with appId ${appId}`)
+        return res.status(404).json({'status': 'no public key found for given user'})
+    }
+
+    const header = { 'intention': 'retrieve-identifier' }
+    const verifiedAuthorization = await validateSign(header, signedAuthorization, derivedPublicKey)
+    if (verifiedAuthorization == null) {
+        console.log('Could not verify the headers')
+        return res.status(400).json({'status': 'could not verify headers'})
     }
 
     const query = db.createQuery('Identifiers').filter('appId', '=', appId).filter('username', '=', username).limit(1)
@@ -86,7 +129,7 @@ app.post('/identify', async (req: Request, res: Response) => {
         await db.save(identity)
         console.log(`Saved ${identity.key.name}: ${identity.data.identifier}`)
 
-        return res.sendStatus(201)
+        return res.status(201).json({'status': 'successfully created identifier'})
     }
 
     identifiers[0].username = username
@@ -96,7 +139,7 @@ app.post('/identify', async (req: Request, res: Response) => {
     await db.update(identifiers[0])
     console.log(`Updated ${username} : ${identifier}`)
 
-    return res.sendStatus(204)
+    return res.send(204).json({'status': 'successfully updated identifier'})
 })
 
 app.post('/notification', async (req: Request, res: Response) => {
@@ -104,7 +147,7 @@ app.post('/notification', async (req: Request, res: Response) => {
 
     if (!body['timestamp'] || !body['message'] || !body['sender'] || !body['me'] || !body['group'] || !body['appId']) {
         console.log(`Not all required parameters are inside the body: `, body)
-        return res.sendStatus(400)
+        return res.status(400).json({'status': 'not all required parameters are inside the body'})
     }
 
     const timestamp = body['timestamp']
@@ -116,7 +159,7 @@ app.post('/notification', async (req: Request, res: Response) => {
 
     if (!req.headers[Headers.JIMBER_HEADER] || !req.headers[Headers.JIMBER_HEADER]) {
         console.log('No Jimber header present')
-        return res.sendStatus(400)
+        return res.status(400).json({'status': 'no jimber header present'})
     }
 
     const signedAuthorization: string = req.headers[Headers.JIMBER_HEADER] as string
@@ -124,17 +167,16 @@ app.post('/notification', async (req: Request, res: Response) => {
 
     const derivedPublicKey = await getDerivedPublicKeyByUsername(me, appId)
     console.log(`Derived key for user: ${me} : `, derivedPublicKey)
-
     if (derivedPublicKey == null) {
         console.log(`Could not find public key for user ${me} with appId ${appId}`)
-        return res.sendStatus(404)
+        return res.status(404).json({'status': 'no public key found for given user'})
     }
 
-    const header = { 'intention': 'notification' }
+    const header = { 'intention': 'retrieve-identifier' }
     const verifiedAuthorization = await validateSign(header, signedAuthorization, derivedPublicKey)
     if (verifiedAuthorization == null) {
         console.log('Could not verify the headers')
-        return res.sendStatus(400)
+        return res.status(400).json({'status': 'could not verify headers'})
     }
 
     const query = db.createQuery('Identifiers').filter('appId', '=', appId).filter('username', '=', me).limit(1)
@@ -156,7 +198,7 @@ app.post('/notification', async (req: Request, res: Response) => {
 
     sendNotification(notificationData, receiverIdentifier)
 
-    return res.sendStatus(200)
+    return res.status(200).json({'status': 'successfully posted notification'})
 })
 
 
