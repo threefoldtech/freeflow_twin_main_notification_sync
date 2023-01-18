@@ -33,49 +33,6 @@ admin.initializeApp({ credential: cert(serviceAccount) })
 
 const db = new Datastore(admin)
 
-app.get('/:username/:appId/identifier', async (req: Request, res: Response) => {
-    const username = req.params.username
-    const appId = req.params.appId;
-
-    if(username == null || appId == null) {
-        console.log('username or appid null')
-        return res.status(400).json({'status' : 'username or appid null'})
-    }
-
-
-    if (!req.headers[Headers.JIMBER_HEADER] || !req.headers[Headers.JIMBER_HEADER]) {
-        console.log('No Jimber header present')
-        return res.status(400).json({'status': 'no jimber header present'})
-    }
-
-    const signedAuthorization: string = req.headers[Headers.JIMBER_HEADER] as string
-    console.log('This is the signed authorization: ', signedAuthorization)
-
-    const derivedPublicKey = await getDerivedPublicKeyByUsername(username, appId)
-    console.log(`Derived key for user: ${username} : `, derivedPublicKey)
-    if (derivedPublicKey == null) {
-        console.log(`Could not find public key for user ${username} with appId ${appId}`)
-        return res.status(404).json({'status': 'no public key found for given user'})
-    }
-
-    const header = { 'intention': 'retrieve-identifier' }
-    const verifiedAuthorization = await validateSign(header, signedAuthorization, derivedPublicKey)
-    if (verifiedAuthorization == null) {
-        console.log('Could not verify the headers')
-        return res.status(400).json({'status': 'could not verify headers'})
-    }
-
-    const query = db.createQuery('Identifiers').filter('appId', '=', appId).filter('username', '=', username).limit(1)
-    const [identifiers] = await db.runQuery(query)
-
-    if(identifiers.length == 0) {
-        return res.status(404).json({'status': 'identifier not found'})
-    }
-
-    return res.status(200).json({'identifier' : identifiers[0]['identifier']})
-})
-
-
 app.post('/identify', async (req: Request, res: Response) => {
     const body = req.body
 
@@ -84,7 +41,7 @@ app.post('/identify', async (req: Request, res: Response) => {
         return res.status(400).json({'status': 'not all required parameters are inside the body'})
     }
 
-    const username = body['username']
+    const username = body['username'] + '.3bot'
     const appId = body['appId']
     const identifier = body['identifier']
 
@@ -155,7 +112,7 @@ app.post('/notification', async (req: Request, res: Response) => {
     const message = body['message']
     const sender = body['sender']
     const group = body['group']
-    const me = body['me']
+    const me = body['me'] + '.3bot'
     const appId = body['appId']
 
     if (!req.headers[Headers.JIMBER_HEADER] || !req.headers[Headers.JIMBER_HEADER]) {
@@ -215,6 +172,7 @@ const sendNotification = (data: NotificationItem, receiverIdentifier: string) =>
 
     FCM.send(message, function(err: any, resp: any) {
         if (err) {
+            console.log('error: ')
             console.log(err)
         }
     })
