@@ -19,7 +19,7 @@
     "fcm-notification": "^2.0.0",
     "firebase-admin": "^11.4.1",
     "firebase-functions": "^3.18.0",
-    "libsodium-wrappers": "^0.7.10",
+    "libsodium-wrappers": "^0.7.15",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1",
     "uuid": "^9.0.0"
